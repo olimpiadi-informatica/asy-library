@@ -17,7 +17,7 @@ add(shift(x, y) * mypicture.drawing(params...));
 More complex tools, for drawing structured objects. It includes:
 
 - `graph.asy` for drawing graphs;
-- `blocks.asy` for drawing pseudo code in block-like style.
+- `layout.asy` for auto-placement of elements in layouts and drawing block-style programs.
 
 ### Tools
 
