@@ -6,6 +6,10 @@ real BLOCK_BORDER = 3;   // border size for blocks
 pair ALIGN = (0.5, 0.5); // default align position
 real TEXT_SIZE = 2;      // default text size
 
+pen START_COLOR = cyan;
+pen BLOCK_COLOR = orange;
+pen FOR_COLOR = magenta;
+pen IF_COLOR = yellow;
 
 // layout element that can be fit to a given size above a minimum
 struct element {
@@ -51,7 +55,6 @@ struct element {
 
 // layout element composed of multiple elements in a row
 element row(real padding=0, real fill_space=1, pair align=ALIGN ... element[] elements) {
-    assert(elements.length > 1, "row requires multiple elements");
     real w = -padding, h = 0;
     for (element e : elements) {
         h = max(h, e.min_size.y);
@@ -79,7 +82,6 @@ element row(real padding=0, real fill_space=1, pair align=ALIGN ... element[] el
 
 // layout element composed of multiple elements in a column
 element column(real padding=0, real fill_space=1, pair align=ALIGN ... element[] elements) {
-    assert(elements.length > 1, "column requires multiple elements");
     real w = 0, h = -padding;
     for (element e : elements) {
         w = max(w, e.min_size.x);
@@ -108,17 +110,21 @@ element column(real padding=0, real fill_space=1, pair align=ALIGN ... element[]
 
 
 // draws the usual block shape
-void draw_block(picture pic, pair size, pen color, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER) {
-    path dent = (0,0) -- (2,0) -- (3,-1) -- (4,0);
+void draw_block(picture pic, pair size, pen color, bool starting = false, real block_padding, real block_border) {
+    guide dent = (0,0) -- (2,0) -- (3,-1) -- (4,0);
     dent = scale(block_padding) * dent;
-    path p = dent -- (size.x, 0) -- size -- reverse(shift(0, size.y)*dent) -- cycle;
-    p = roundedpath(p, 0.3*block_padding);
+    guide p = dent -- (size.x, 0) -- size;
+    if (starting)
+        p = p .. (size.x/2, size.y + 2*block_padding) .. (0, size.y) -- cycle;
+    else
+        p = roundedpath(p -- reverse(shift(0, size.y)*dent) -- cycle, 0.3*block_padding);
     filldraw(pic, p, 0.3*color + 0.7*white, 0.7*color + 0.3*black + block_border);
 }
 
 
 // generates a single block given the content
-element block(element content, pen color, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER) {
+element block(element content, pen color = invisible, bool starting = false, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER) {
+    if (color == invisible) color = starting ? START_COLOR : BLOCK_COLOR;
     real w = content.min_size.x + 2*block_padding;
     real h = content.min_size.y + 2*block_padding;
     return element(
@@ -127,7 +133,7 @@ element block(element content, pen color, real block_padding = BLOCK_PADDING, re
             assert(size.x >= w && size.y >= h, "cannot fit block in given size");
             picture pic;
             unitsize(pic, 1cm);
-            draw_block(pic, size, color, block_padding, block_border);
+            draw_block(pic, size, color, starting, block_padding, block_border);
             add(pic, shift(block_padding, block_padding) * content.fit_to_size(size - (block_padding,block_padding)*2));
             return pic;
         }
@@ -194,4 +200,19 @@ element nested_blocks(pen color, real block_padding = BLOCK_PADDING, real block_
             return pic;
         }
     );
+}
+
+// nests multiple block sequences into a single block
+element for_block(pen color = FOR_COLOR, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER, element header, element body) {
+    return nested_blocks(color, block_padding, block_border, header, body);
+}
+
+// nests multiple block sequences into a single block
+element if_block(pen color = IF_COLOR, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER, element header, element body) {
+    return nested_blocks(color, block_padding, block_border, header, body);
+}
+
+// nests multiple block sequences into a single block
+element else_block(pen color = IF_COLOR, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER, element then_header, element then_body, element else_header, element else_body) {
+    return nested_blocks(color, block_padding, block_border, then_header, then_body, else_header, else_body);
 }
