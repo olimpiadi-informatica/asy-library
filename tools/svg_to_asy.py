@@ -60,35 +60,40 @@ def path_to_cmds(s):
             raise e
     return w
 
-def cmd_to_asy(cur, cmd, args):
+def cmd_to_asy(start, cur, cmd, args):
     if cmd.lower() == 'z':
-        return cur, " -- cycle"
+        return start, start, " -- cycle"
     if cmd == 'h':
         cur = point_add(cur, (args[0],0))
         s = " -- " + print_point(cur)
-        return cur, s
+        return start, cur, s
     if cmd == 'H':
         cur = (args[0],cur[1])
         s = " -- " + print_point(cur)
-        return cur, s
+        return start, cur, s
     if cmd == 'v':
         cur = point_add(cur, (0,args[0]))
         s = " -- " + print_point(cur)
-        return cur, s
+        return start, cur, s
     if cmd == 'V':
         cur = (cur[0],args[0])
         s = " -- " + print_point(cur)
-        return cur, s
+        return start, cur, s
     args = [(args[2*i],args[2*i+1]) for i in range(len(args)//2)]
     if cmd == cmd.lower():
         args = list(point_add(cur,p) for p in args)
     s = ""
-    if cmd.lower() in 'ml':
+    if cmd.lower() == 'l':
         s = " -- " + print_point(args[0])
+    elif cmd.lower() == 'm':
+        s = " ^^ " + print_point(args[0])
+        start = args[-1]
     elif cmd.lower() == 'c':
         s =  " .. controls %s and %s .. %s" % tuple(map(print_point, args))
+    else:
+        print("UNRECOGNISED COMMAND:", cmd, args, file=stderr)
     cur = args[-1]
-    return cur, s
+    return start, cur, s
 
 def get_color_map():
     color_levels = [0, 12, 25, 64, 128, 192, 230, 243, 255]
@@ -130,7 +135,7 @@ def get_color_map():
     for c, v in special_colors.items():
         m[f(v)] = c
     for i in range(1,8):
-        m[f(i for _ in range(3))] = color_values[i-1][0]+'gray'
+        m[f(8-i for _ in range(3))] = color_values[i-1][0]+'gray'
     for col, hue in color_hues.items():
         for shade, val in color_values:
             m[f(val[h] for h in hue)] = color_rename[shade+col] if shade+col in color_rename else shade+col
@@ -157,20 +162,23 @@ def parse_color(s):
     return best if d < CTHR else 'rgb("%s")' % s[1:]
 
 def parse_style(s):
-    if re.fullmatch("fill:[^;]*; *stroke:[^;]*;?", s):
-        fill, stroke = re.split('; *', s)[:2]
-        fill = parse_color(fill[5:])
-        stroke = parse_color(stroke[7:])
-        if fill is None:
-            return "draw(pic, p, %s);" % stroke
-        if stroke is None:
-            return "fill(pic, p, %s);" % fill
-        return "filldraw(pic, p, %s, %s);" % (fill, stroke)
-    d = [i.strip() for i in s.split(';')]
-    if d[-1] == "":
-        d = d[:-1]
-    d = [tuple(j.strip() for j in i.split(':')) for i in d]
-    d = {k : v for k,v in d}
+    if isinstance(s, str):
+        if re.fullmatch("fill:[^;]*; *stroke:[^;]*;?", s):
+            fill, stroke = re.split('; *', s)[:2]
+            fill = parse_color(fill[5:])
+            stroke = parse_color(stroke[7:])
+            if fill is None:
+                return "draw(pic, p, %s);" % stroke
+            if stroke is None:
+                return "fill(pic, p, %s);" % fill
+            return "filldraw(pic, p, %s, %s);" % (fill, stroke)
+        d = [i.strip() for i in s.split(';')]
+        if d[-1] == "":
+            d = d[:-1]
+        d = [tuple(j.strip() for j in i.split(':')) for i in d]
+        d = {k : v for k,v in d}
+    else:
+        d = s
     fill = 'invisible'
     if 'fill' in d:
         fill = parse_color(d['fill'])
@@ -219,7 +227,7 @@ def parse_style(s):
         if draw != 'invisible' and abs(float(d['stroke-miterlimit']) - 10) >= 0.1:
             draw += "+miterlimit(%s)" % d['stroke-miterlimit']
         del d['stroke-miterlimit']
-    d = ';'.join(k+':'+v for k,v in d.items())
+    d = ';'.join(k+':'+v for k,v in d.items() if k not in ('id', 'd'))
     if d != '':
         d = " //IGNORED: " + d
     if fill == 'invisible' and draw == 'invisible':
@@ -232,13 +240,24 @@ def parse_style(s):
 
 def parse_path(p):
     cmds = path_to_cmds(p.attrib['d'])
-    cur = (0,0)
+    style = parse_style(p.attrib['style'] if 'style' in p.attrib else p.attrib)
+    if style[:4] == "fill" and cmds[-1][0].lower() != 'z':
+        new = cmds[:1]
+        for c in cmds[1:]:
+            if c[0].lower() == 'm':
+                new.append(['Z'])
+            new.append(c)
+        new.append(['Z'])
+        cmds = new
+    start = cur = (0,0)
     line = ''
     for cmd in cmds:
-        cur, s = cmd_to_asy(cur, cmd[0], list(cmd[1:]))
+        start, cur, s = cmd_to_asy(start, cur, cmd[0], list(cmd[1:]))
         line += s
-    style = parse_style(p.attrib['style'])
-    return "\tp = %s;\n\t%s" % (line[4:],style)
+    if ' ^^ ' in line[4:]:
+        return "\tp = %s;\n\t%s" % (line[4:],style)
+    else:
+        return "\tp[0] = %s;\n\t%s" % (line[4:],style.replace('p', 'p[0]'))
 
 def parse_xml_element(e):
     if e.tag == "{http://www.w3.org/2000/svg}path":
@@ -261,12 +280,13 @@ def parse_svg(path, scale, approx):
         SCALE = 2*scale/max(SIZE)
     print("picture drawing(real k = 1) {")
     print("\tpicture pic;")
-    print("\tpath p;")
+    print("\tpath[] p;")
     for e in tree.getroot():
         parse_xml_element(e)
     print("\treturn scale(k/32)*pic;")
     print("}")
-    print("add(drawing(1));")
+    #print("unitsize(1cm);")
+    #print("add(drawing(1));")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -287,7 +307,7 @@ if __name__ == "__main__":
         "--approx",
         help="Decimal places to which the numbers should be rounded (defaults to 0)",
         type=int,
-        default=0,
+        default=1,
         nargs='?'
     )
     parser.add_argument(

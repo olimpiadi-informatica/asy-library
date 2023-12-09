@@ -21,6 +21,12 @@ More complex tools, for drawing structured objects. It includes:
 
 ### Tools
 
-Helper scripts that can be useful in expanding the library or otherwise manipulating asymptote files. It includes:
+Helper scripts that can be useful in expanding the library or otherwise manipulating asymptote files.
 
-- `svg_to_asy.py`: converts an SVG file into Asymptote code, to allow parametrization of existing third-party pictures. It is **strongly recommended** to tweak the SVG file with [Inkscape](https://inkscape.org) first, in particular using its "simplify path" tool to reduce the number of points in the SVG hence the size of the translated code.
+#### SVG to ASY
+
+Converts an SVG file into Asymptote code, to allow parametrization of existing third-party pictures. Picture must be already in SVG format: you may vectorize a bitmap through tools such as [svgtrace](https://svgtrace.com/png-to-svg). It is **strongly recommended** to tweak the SVG file with [Inkscape](https://inkscape.org) first, in particular using its "path > simplify" tool to reduce the number of points in the SVG hence the size of the translated code. Then you can convert it to asymptote code through:
+
+```
+tools/svg_to_asy.py -c 100 path/to/file.svg > path/to/file.asy
+```
