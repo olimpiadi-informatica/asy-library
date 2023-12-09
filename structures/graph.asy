@@ -1,6 +1,6 @@
 import math;
 
-pen FOREGROUND = black; // the graph default foreground color
+pen FOREGROUND = black+1; // the graph default foreground color
 pen BACKGROUND = white; // the graph default background color
 bool ORIENTED = false; // whether the graph is oriented by default
 
@@ -19,7 +19,7 @@ real[] deg, bend;
 void node(real node_size, pair pos, real text_size, string txt = "", pen foreground = FOREGROUND, pen background = BACKGROUND) {
     path c = circle(pos, node_size);
     fill(c, background);
-    draw(c, foreground+1);
+    draw(c, foreground);
     label(scale(text_size)*txt, pos, foreground);
 }
 

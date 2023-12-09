@@ -254,10 +254,7 @@ def parse_path(p):
     for cmd in cmds:
         start, cur, s = cmd_to_asy(start, cur, cmd[0], list(cmd[1:]))
         line += s
-    if ' ^^ ' in line[4:]:
-        return "\tp = %s;\n\t%s" % (line[4:],style)
-    else:
-        return "\tp[0] = %s;\n\t%s" % (line[4:],style.replace('p', 'p[0]'))
+    return "\tp = %s;\n\t%s" % (line[4:],style)
 
 def parse_xml_element(e):
     if e.tag == "{http://www.w3.org/2000/svg}path":
