@@ -22,6 +22,3 @@ picture drawing(real k = 1, pen color = brown, pen knob = yellow, string title =
     label(pic, scale(13*k/(length(title)+1)*1.45)*("\sc "+title), (-23,0));
     return scale(k/32)*pic;
 }
-
-unitsize(1cm);
-add(drawing(red, green));
