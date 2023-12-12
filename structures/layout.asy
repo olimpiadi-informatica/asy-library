@@ -108,6 +108,66 @@ element column(real padding=0, real fill_space=1, pair align=ALIGN ... element[]
     );
 }
 
+// layout element composed of multiple elements in a rectangular grid
+element grid(real padding=0, bool even_cols=false, bool even_rows=false, pen border=invisible, element[][] elements) {
+    real[] w, h;
+    for (int i=0; i<elements.length; ++i) h[i] = 0;
+    for (int j=0; j<elements[0].length; ++j) w[j] = 0;
+    for (int i=0; i<elements.length; ++i)
+        for (int j=0; j<elements[0].length; ++j) {
+            h[i] = max(h[i], elements[i][j].min_size.y);
+            w[j] = max(w[j], elements[i][j].min_size.x);
+        }
+    if (even_cols) {
+        for (int j=1; j<elements[0].length; ++j) w[0] = max(w[0], w[j]);
+        for (int j=1; j<elements[0].length; ++j) w[j] = w[0];
+    }
+    if (even_rows) {
+        for (int i=0; i<elements.length; ++i) h[0] = max(h[0], h[i]);
+        for (int i=0; i<elements.length; ++i) h[i] = h[0];
+    }
+    for (int i=0; i<elements.length; ++i) h[i] += 2*padding;
+    for (int j=0; j<elements[0].length; ++j) w[j] += 2*padding;
+    real tw = 0, th = 0;
+    for (real x : h) th += x;
+    for (real x : w) tw += x;
+    return element(
+        (tw, th),
+        new picture(pair size) {
+            assert(size.x >= tw && size.y >= th, "cannot fit element in given size");
+            picture pic;
+            unitsize(pic, 1cm);
+            pair extra = size - (tw,th);
+            real yoffs = 0;
+            if (border != invisible) {
+                real yoffs = 0;
+                for (int i=elements.length-1; i>=0; --i) {
+                    draw(pic, (0,yoffs) -- (size.x,yoffs), border);
+                    yoffs += h[i] + extra.y / elements.length;
+                }
+                draw(pic, (0,yoffs) -- (size.x,yoffs), border);
+                real xoffs = 0;
+                for (int j=0; j<elements[0].length; ++j) {
+                    draw(pic, (xoffs,0) -- (xoffs,size.y), border);
+                    xoffs += w[j] + extra.x / elements[0].length;
+                }
+                draw(pic, (xoffs,0) -- (xoffs,size.y), border);
+            }
+            for (int i=elements.length-1; i>=0; --i) {
+                real xoffs = 0;
+                for (int j=0; j<elements[0].length; ++j) {
+                    element e = elements[i][j];
+                    picture p = e.fit_to_size((w[j]-2*padding+extra.y / elements[0].length, h[i]-2*padding+extra.y / elements.length));
+                    unitsize(p, 1cm);
+                    add(pic, shift(xoffs+padding, yoffs+padding)*p);
+                    xoffs += w[j] + extra.x / elements[0].length;
+                }
+                yoffs += h[i] + extra.y / elements.length;
+            }
+            return pic;
+        }
+    );
+}
 
 // draws the usual block shape
 void draw_block(picture pic, pair size, pen color, bool starting = false, real block_padding, real block_border) {
@@ -126,7 +186,7 @@ void draw_block(picture pic, pair size, pen color, bool starting = false, real b
 element block(element content, pen color = invisible, bool starting = false, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER) {
     if (color == invisible) color = starting ? START_COLOR : BLOCK_COLOR;
     real w = content.min_size.x + 2*block_padding;
-    real h = content.min_size.y + 2*block_padding;
+    real h = content.min_size.y + 3*block_padding;
     return element(
         (w, h),
         new picture(pair size) {
@@ -134,7 +194,7 @@ element block(element content, pen color = invisible, bool starting = false, rea
             picture pic;
             unitsize(pic, 1cm);
             draw_block(pic, size, color, starting, block_padding, block_border);
-            add(pic, shift(block_padding, block_padding) * content.fit_to_size(size - (block_padding,block_padding)*2));
+            add(pic, shift(block_padding, 1.5*block_padding) * content.fit_to_size(size - (block_padding,1.5*block_padding)*2));
             return pic;
         }
     );
@@ -170,7 +230,7 @@ element block_sequence(real block_border = BLOCK_BORDER ... element[] blocks) {
 element nested_blocks(pen color, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] elements) {
     assert(elements.length >= 2, "empty nested blocks");
     assert(elements.length % 2 == 0, "odd number of nested elements");
-    real w = 0, h = (1.5*elements.length+1)*block_padding;
+    real w = 0, h = (1.5*elements.length+2)*block_padding;
     for (element e : elements) {
         w = max(w, e.min_size.x + 2*block_padding);
         h += e.min_size.y;
