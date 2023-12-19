@@ -3,9 +3,11 @@ import roundedpath;
 
 real BLOCK_PADDING = .3; // padding between block content and borders
 real BLOCK_BORDER = 3;   // border size for blocks
+real BOX_BORDER = 3;     // border size for boxes
 pair ALIGN = (0.5, 0.5); // default align position
 real TEXT_SIZE = 2;      // default text size
 
+pen BOX_COLOR = black;
 pen START_COLOR = cyan;
 pen BLOCK_COLOR = orange;
 pen FOR_COLOR = magenta;
@@ -51,6 +53,27 @@ struct element {
         this.operator init(pic, align);
     }
 };
+
+
+// layout element boxing another element in various directions
+element box(real padding=0, bool draw_up=true, bool draw_down=true, bool draw_left=true, bool draw_right=true, pen border=BOX_COLOR+BOX_BORDER, element e) {
+    real w = e.min_size.x+2*padding;
+    real h = e.min_size.y+2*padding;
+    return element(
+        (w, h),
+        new picture(pair size) {
+            assert(size.x >= w && size.y >= h, "cannot fit element in given size");
+            picture pic;
+            unitsize(pic, 1cm);
+            add(pic, shift(padding, padding)*e.fit_to_size((size.x-2*padding, size.y-2*padding)));
+            if (draw_up)    draw(pic, (0,size.y) -- size,  border);
+            if (draw_down)  draw(pic, (0,0) -- (size.x,0), border);
+            if (draw_left)  draw(pic, (0,0) -- (0,size.y), border);
+            if (draw_right) draw(pic, (size.x,0) -- size,  border);
+            return pic;
+        }
+    );
+}
 
 
 // layout element composed of multiple elements in a row
