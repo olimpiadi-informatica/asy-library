@@ -1,6 +1,8 @@
 import math;
 import roundedpath;
 
+real EPSILON = 1e-3; // error tolerance
+
 real BLOCK_PADDING = .3; // padding between block content and borders
 real BLOCK_BORDER = 3;   // border size for blocks
 real BOX_BORDER = 3;     // border size for boxes
@@ -9,7 +11,10 @@ real TEXT_SIZE = 2;      // default text size
 
 pen BOX_COLOR = black;
 pen START_COLOR = cyan;
-pen BLOCK_COLOR = orange;
+pen INSTR_COLOR = orange;
+pen COND_COLOR = green;
+pen DATA_COLOR = brown;
+pen CHOICE_COLOR = mediumblue;
 pen FOR_COLOR = magenta;
 pen IF_COLOR = yellow;
 
@@ -49,10 +54,18 @@ struct element {
     // text initialiser
     void operator init(string text, real size=TEXT_SIZE, pen p=currentpen, pair align=ALIGN) {
         picture pic;
-        label(pic, scale(size)*text, (0,0), p);
+        label(pic, scale(size)*(text+"\vphantom{bp}"), (0,0), p);
         this.operator init(pic, align);
     }
 };
+
+element e(picture pic, pair align=ALIGN) {
+    return element(pic, align);
+}
+
+element e(string text, real size=TEXT_SIZE, pen p=currentpen, pair align=ALIGN) {
+    return element(text, size, p, align);
+}
 
 
 // layout element boxing another element in various directions
@@ -62,7 +75,7 @@ element box(real padding=0, bool draw_up=true, bool draw_down=true, bool draw_le
     return element(
         (w, h),
         new picture(pair size) {
-            assert(size.x >= w && size.y >= h, "cannot fit element in given size");
+            assert(size.x >= w-EPSILON && size.y >= h-EPSILON, "cannot fit element in given size");
             picture pic;
             unitsize(pic, 1cm);
             add(pic, shift(padding, padding)*e.fit_to_size((size.x-2*padding, size.y-2*padding)));
@@ -86,16 +99,17 @@ element row(real padding=0, real fill_space=1, pair align=ALIGN ... element[] el
     return element(
         (w, h),
         new picture(pair size) {
-            assert(size.x >= w && size.y >= h, "cannot fit element in given size");
+            assert(size.x >= w-EPSILON && size.y >= h-EPSILON, "cannot fit element in given size");
             picture pic;
             unitsize(pic, 1cm);
             real extra = size.x - w;
             real offs = extra*(1-fill_space)*align.x;
             for (element e : elements) {
                 real sx = e.min_size.x + extra/elements.length*fill_space;
-                picture p = e.fit_to_size((sx, size.y));
+                real sy = e.min_size.y*(1-fill_space) + size.y*fill_space;
+                picture p = e.fit_to_size((sx, sy));
                 unitsize(p, 1cm);
-                add(pic, shift(offs, 0)*p);
+                add(pic, shift(offs, (size.y - sy)*align.y)*p);
                 offs += sx + padding;
             }
             return pic;
@@ -113,7 +127,7 @@ element column(real padding=0, real fill_space=1, pair align=ALIGN ... element[]
     return element(
         (w, h),
         new picture(pair size) {
-            assert(size.x >= w && size.y >= h, "cannot fit element in given size");
+            assert(size.x >= w-EPSILON && size.y >= h-EPSILON, "cannot fit element in given size");
             picture pic;
             unitsize(pic, 1cm);
             real extra = size.y - h;
@@ -121,9 +135,10 @@ element column(real padding=0, real fill_space=1, pair align=ALIGN ... element[]
             for (int i=elements.length-1; i>=0; --i) {
                 element e = elements[i];
                 real sy = e.min_size.y + extra/elements.length*fill_space;
-                picture p = e.fit_to_size((size.x, sy));
+                real sx = e.min_size.x*(1-fill_space) + size.x*fill_space;
+                picture p = e.fit_to_size((sx, sy));
                 unitsize(p, 1cm);
-                add(pic, shift(0, offs)*p);
+                add(pic, shift((size.x - sx)*align.x, offs)*p);
                 offs += sy + padding;
             }
             return pic;
@@ -157,7 +172,7 @@ element grid(real padding=0, bool even_cols=false, bool even_rows=false, pen bor
     return element(
         (tw, th),
         new picture(pair size) {
-            assert(size.x >= tw && size.y >= th, "cannot fit element in given size");
+            assert(size.x >= tw-EPSILON && size.y >= th-EPSILON, "cannot fit element in given size");
             picture pic;
             unitsize(pic, 1cm);
             pair extra = size - (tw,th);
@@ -192,36 +207,104 @@ element grid(real padding=0, bool even_cols=false, bool even_rows=false, pen bor
     );
 }
 
-// draws the usual block shape
-void draw_block(picture pic, pair size, pen color, bool starting = false, real block_padding, real block_border) {
-    guide dent = (0,0) -- (2,0) -- (3,-1) -- (4,0);
-    dent = scale(block_padding) * dent;
-    guide p = dent -- (size.x, 0) -- size;
-    if (starting)
-        p = p .. (size.x/2, size.y + 2*block_padding) .. (0, size.y) -- cycle;
-    else
-        p = roundedpath(p -- reverse(shift(0, size.y)*dent) -- cycle, 0.3*block_padding);
-    filldraw(pic, p, 0.3*color + 0.7*white, 0.7*color + 0.3*black + block_border);
+
+// the block dent shape
+guide block_dent = (0,0) -- (2,0) -- (3,-1) -- (4,0);
+
+// the starting block shape
+path start_shape(pair size, real padding) {
+    return roundedpath((scale(padding) * block_dent) -- (size.x, 0), 0.3*padding) -- size .. (size.x/2, size.y + 2*padding) .. (0, size.y) -- cycle;
+}
+
+// the instruction block shape
+path instr_shape(pair size, real padding) {
+    guide g = scale(padding)*block_dent -- (size.x, 0) -- size -- reverse(shift(0, size.y)*scale(padding)*block_dent) -- cycle;
+    return roundedpath(g, 0.3*padding);
+}
+
+// the drop-down choice block shape
+path cond_shape(pair size, real padding) {
+    padding = min(2.5*padding, size.x/2);
+    guide g = (-padding/3, size.y/2) -- (padding, 0) -- (size.x - padding, 0) -- (size.x+padding/3, size.y/2) -- (size.x - padding, size.y) -- (padding, size.y) -- cycle;
+    return roundedpath(g, 0.3*padding);
+}
+
+// the drop-down choice block shape
+path data_shape(pair size, real padding) {
+    padding = min(3*padding, size.x/2);
+    return (0, size.y/2) {S}..{E} (padding, 0) -- (size.x - padding, 0) {E}..{N} (size.x, size.y/2) {N}..{W} (size.x - padding, size.y) -- (padding, size.y) {W}..{S} cycle;
+}
+
+// the drop-down choice block shape
+path choice_shape(pair size, real padding) {
+    guide g = (0, 0) -- (size.x, 0) -- size -- (0, size.y) -- cycle;
+    return roundedpath(g, 0.3*padding);
+}
+
+// draws a general shape
+void draw_shape(picture pic, path shape, pen color, real block_border) {
+    filldraw(pic, shape, 0.3*color + 0.7*white, 0.7*color + 0.3*black + block_border);
+}
+
+
+// layout element composed of multiple elements in a row
+element block_content(real block_padding = BLOCK_PADDING ... element[] elements) {
+    return row(block_padding, 0, (0,0.5) ... elements);
 }
 
 
 // generates a single block given the content
-element block(element content, pen color = invisible, bool starting = false, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER) {
-    if (color == invisible) color = starting ? START_COLOR : BLOCK_COLOR;
+element block(path shape(pair,real), pen color = invisible, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
+    if (color == invisible) {
+        if (shape == start_shape) color = START_COLOR;
+        if (shape == instr_shape) color = INSTR_COLOR;
+        if (shape == cond_shape) color = COND_COLOR;
+        if (shape == data_shape) color = DATA_COLOR;
+        if (shape == choice_shape) color = CHOICE_COLOR;
+    }
+    element content;
+    if (contents.length == 1) content = contents[0];
+    else content = block_content(block_padding ... contents);
     real w = content.min_size.x + 2*block_padding;
     real h = content.min_size.y + 3*block_padding;
     return element(
         (w, h),
         new picture(pair size) {
-            assert(size.x >= w && size.y >= h, "cannot fit block in given size");
+            assert(size.x >= w-EPSILON && size.y >= h-EPSILON, "cannot fit block in given size");
             picture pic;
             unitsize(pic, 1cm);
-            draw_block(pic, size, color, starting, block_padding, block_border);
+            draw_shape(pic, shape(size, block_padding), color, block_border);
             add(pic, shift(block_padding, 1.5*block_padding) * content.fit_to_size(size - (block_padding,1.5*block_padding)*2));
             return pic;
         }
     );
 }
+
+// generates a single starting block given the content
+element start_block(pen color = START_COLOR, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
+    return block(start_shape, color, block_padding, block_border ... contents);
+}
+
+// generates a single instruction block given the content
+element instr_block(pen color = INSTR_COLOR, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
+    return block(instr_shape, color, block_padding, block_border ... contents);
+}
+
+// generates a single condition block given the content
+element cond_block(pen color = COND_COLOR, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
+    return block(cond_shape, color, block_padding, block_border ... contents);
+}
+
+// generates a single data block given the content
+element data_block(pen color = DATA_COLOR, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
+    return block(data_shape, color, block_padding, block_border ... contents);
+}
+
+// generates a single instruction block given the content
+element choice_block(pen color = CHOICE_COLOR, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
+    return block(choice_shape, color, block_padding, block_border ... contents);
+}
+
 
 // concatenate blocks in a vertical sequence
 element block_sequence(real block_border = BLOCK_BORDER ... element[] blocks) {
@@ -234,7 +317,7 @@ element block_sequence(real block_border = BLOCK_BORDER ... element[] blocks) {
     return element(
         (w, h),
         new picture(pair size) {
-            assert(size.x >= w && size.y >= h, "cannot fit block in given size");
+            assert(size.x >= w-EPSILON && size.y >= h-EPSILON, "cannot fit block in given size");
             picture pic;
             unitsize(pic, 1cm);
             real yoffs = 0;
@@ -265,10 +348,10 @@ element nested_blocks(pen color, real block_padding = BLOCK_PADDING, real block_
     return element(
         (w, h),
         new picture(pair size) {
-            assert(size.x >= w && size.y >= h, "cannot fit block in given size");
+            assert(size.x >= w-EPSILON && size.y >= h-EPSILON, "cannot fit block in given size");
             picture pic;
             unitsize(pic, 1cm);
-            draw_block(pic, size, color, block_padding, block_border);
+            draw_shape(pic, instr_shape(size, block_padding), color, block_border);
             real yoffs = block_padding;
             for (int i=blocks.length-1; i>=0; --i) {
                 yoffs += block_padding;
