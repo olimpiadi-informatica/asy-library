@@ -6,6 +6,7 @@ real EPSILON = 1e-3; // error tolerance
 real BLOCK_PADDING = .3; // padding between block content and borders
 real BLOCK_BORDER = 3;   // border size for blocks
 real BOX_BORDER = 3;     // border size for boxes
+pair FILL = (1, 1);      // default fill setting for composite elements
 pair ALIGN = (0.5, 0.5); // default align position
 real TEXT_SIZE = 2;      // default text size
 
@@ -38,33 +39,38 @@ struct element {
     }
     
     // picture initialiser
-    void operator init(picture pic, pair align=ALIGN) {
+    void operator init(picture pic, real keep_aspect=1, pair fill_space=(0,0), pair align=ALIGN) {
         unitsize(pic, 1cm);
         pic = shift(-min(pic, true))*pic;
         this.min_size = max(pic, true);
         this.fit_to_size = new picture(pair size) {
             picture p;
             unitsize(p, 1cm);
-            pair extra = size - this.min_size;
-            add(p, shift(extra.x*align.x, extra.y*align.y)*pic);
+            real sx = this.min_size.x + (size.x - this.min_size.x)*fill_space.x;
+            real sy = this.min_size.y + (size.y - this.min_size.y)*fill_space.y;
+            real s = min(sqrt(sx/this.min_size.x*sy/this.min_size.y), min(size.x/this.min_size.x, size.y/this.min_size.y));
+            sx = s * this.min_size.x * keep_aspect + sx * (1-keep_aspect);
+            sy = s * this.min_size.y * keep_aspect + sy * (1-keep_aspect);
+            pair extra = size - (sx, sy);
+            add(p, shift(extra.x*align.x, extra.y*align.y)*scale(sx/this.min_size.x, sy/this.min_size.y)*pic);
             return p;
         };
     }
 
     // text initialiser
-    void operator init(string text, real size=TEXT_SIZE, pen p=currentpen, pair align=ALIGN) {
+    void operator init(string text, real size=TEXT_SIZE, pen p=currentpen, real keep_aspect=1, pair fill_space=(0,0), pair align=ALIGN) {
         picture pic;
         label(pic, scale(size)*(text+"\vphantom{bp}"), (0,0), p);
-        this.operator init(pic, align);
+        this.operator init(pic, keep_aspect, fill_space, align);
     }
 };
 
-element e(picture pic, pair align=ALIGN) {
-    return element(pic, align);
+element e(picture pic, real keep_aspect=1, pair fill_space=(0,0), pair align=ALIGN) {
+    return element(pic, keep_aspect, fill_space, align);
 }
 
-element e(string text, real size=TEXT_SIZE, pen p=currentpen, pair align=ALIGN) {
-    return element(text, size, p, align);
+element e(string text, real size=TEXT_SIZE, pen p=currentpen, real keep_aspect=1, pair fill_space=(0,0), pair align=ALIGN) {
+    return element(text, size, p, keep_aspect, fill_space, align);
 }
 
 
@@ -90,7 +96,7 @@ element box(real padding=0, bool draw_up=true, bool draw_down=true, bool draw_le
 
 
 // layout element composed of multiple elements in a row
-element row(real padding=0, real fill_space=1, pair align=ALIGN ... element[] elements) {
+element row(real padding=0, pair fill_space=FILL, pair align=ALIGN ... element[] elements) {
     real w = -padding, h = 0;
     for (element e : elements) {
         h = max(h, e.min_size.y);
@@ -103,10 +109,10 @@ element row(real padding=0, real fill_space=1, pair align=ALIGN ... element[] el
             picture pic;
             unitsize(pic, 1cm);
             real extra = size.x - w;
-            real offs = extra*(1-fill_space)*align.x;
+            real offs = extra*(1-fill_space.x)*align.x;
             for (element e : elements) {
-                real sx = e.min_size.x + extra/elements.length*fill_space;
-                real sy = e.min_size.y*(1-fill_space) + size.y*fill_space;
+                real sx = e.min_size.x + extra/elements.length*fill_space.x;
+                real sy = e.min_size.y*(1-fill_space.y) + size.y*fill_space.y;
                 picture p = e.fit_to_size((sx, sy));
                 unitsize(p, 1cm);
                 add(pic, shift(offs, (size.y - sy)*align.y)*p);
@@ -118,7 +124,7 @@ element row(real padding=0, real fill_space=1, pair align=ALIGN ... element[] el
 }
 
 // layout element composed of multiple elements in a column
-element column(real padding=0, real fill_space=1, pair align=ALIGN ... element[] elements) {
+element column(real padding=0, pair fill_space=FILL, pair align=ALIGN ... element[] elements) {
     real w = 0, h = -padding;
     for (element e : elements) {
         w = max(w, e.min_size.x);
@@ -131,11 +137,11 @@ element column(real padding=0, real fill_space=1, pair align=ALIGN ... element[]
             picture pic;
             unitsize(pic, 1cm);
             real extra = size.y - h;
-            real offs = extra*(1-fill_space)*align.y;
+            real offs = extra*(1-fill_space.y)*align.y;
             for (int i=elements.length-1; i>=0; --i) {
                 element e = elements[i];
-                real sy = e.min_size.y + extra/elements.length*fill_space;
-                real sx = e.min_size.x*(1-fill_space) + size.x*fill_space;
+                real sy = e.min_size.y + extra/elements.length*fill_space.y;
+                real sx = e.min_size.x*(1-fill_space.x) + size.x*fill_space.x;
                 picture p = e.fit_to_size((sx, sy));
                 unitsize(p, 1cm);
                 add(pic, shift((size.x - sx)*align.x, offs)*p);
@@ -208,6 +214,12 @@ element grid(real padding=0, bool even_cols=false, bool even_rows=false, pen bor
 }
 
 
+// layout element composed of multiple elements in a row, to be used in code blocks
+element block_content(real block_padding = BLOCK_PADDING ... element[] elements) {
+    return row(block_padding, (0,0), (0,0.5) ... elements);
+}
+
+
 // the block dent shape
 guide block_dent = (0,0) -- (2,0) -- (3,-1) -- (4,0);
 
@@ -247,21 +259,8 @@ void draw_shape(picture pic, path shape, pen color, real block_border) {
 }
 
 
-// layout element composed of multiple elements in a row
-element block_content(real block_padding = BLOCK_PADDING ... element[] elements) {
-    return row(block_padding, 0, (0,0.5) ... elements);
-}
-
-
 // generates a single block given the content
-element block(path shape(pair,real), pen color = invisible, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
-    if (color == invisible) {
-        if (shape == start_shape) color = START_COLOR;
-        if (shape == instr_shape) color = INSTR_COLOR;
-        if (shape == cond_shape) color = COND_COLOR;
-        if (shape == data_shape) color = DATA_COLOR;
-        if (shape == choice_shape) color = CHOICE_COLOR;
-    }
+element block(path shape(pair,real), pen color, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
     element content;
     if (contents.length == 1) content = contents[0];
     else content = block_content(block_padding ... contents);
@@ -281,33 +280,33 @@ element block(path shape(pair,real), pen color = invisible, real block_padding =
 }
 
 // generates a single starting block given the content
-element start_block(pen color = START_COLOR, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
-    return block(start_shape, color, block_padding, block_border ... contents);
+element start_block(real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
+    return block(start_shape, START_COLOR, block_padding, block_border ... contents);
 }
 
 // generates a single instruction block given the content
-element instr_block(pen color = INSTR_COLOR, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
-    return block(instr_shape, color, block_padding, block_border ... contents);
+element instr_block(real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
+    return block(instr_shape, INSTR_COLOR, block_padding, block_border ... contents);
 }
 
 // generates a single condition block given the content
-element cond_block(pen color = COND_COLOR, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
-    return block(cond_shape, color, block_padding, block_border ... contents);
+element cond_block(real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
+    return block(cond_shape, COND_COLOR, block_padding, block_border ... contents);
 }
 
 // generates a single data block given the content
-element data_block(pen color = DATA_COLOR, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
-    return block(data_shape, color, block_padding, block_border ... contents);
+element data_block(real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
+    return block(data_shape, DATA_COLOR, block_padding, block_border ... contents);
 }
 
 // generates a single instruction block given the content
-element choice_block(pen color = CHOICE_COLOR, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
-    return block(choice_shape, color, block_padding, block_border ... contents);
+element choice_block(real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
+    return block(choice_shape, CHOICE_COLOR, block_padding, block_border ... contents);
 }
 
 
 // concatenate blocks in a vertical sequence
-element block_sequence(real block_border = BLOCK_BORDER ... element[] blocks) {
+element block_sequence(pair fill_space = (1,1), real block_border = BLOCK_BORDER ... element[] blocks) {
     real w = 0, h = 0;
     for (element b : blocks) {
         w = max(w, b.min_size.x);
@@ -322,7 +321,9 @@ element block_sequence(real block_border = BLOCK_BORDER ... element[] blocks) {
             unitsize(pic, 1cm);
             real yoffs = 0;
             for (int i=blocks.length-1; i>=0; --i) {
-                picture p = blocks[i].fit_to_size((size.x, blocks[i].min_size.y + (size.y-h)/blocks.length));
+                real sx = size.x * fill_space.x + blocks[i].min_size.x * (1-fill_space.x);
+                real sy = blocks[i].min_size.y + (size.y-h) / blocks.length * fill_space.y;
+                picture p = blocks[i].fit_to_size((sx, sy));
                 unitsize(p, 1cm);
                 add(pic, shift(0, yoffs)*p);
                 yoffs += max(p, true).y + 0.017*block_border;
@@ -333,7 +334,7 @@ element block_sequence(real block_border = BLOCK_BORDER ... element[] blocks) {
 }
 
 // nests multiple block sequences into a single block
-element nested_blocks(pen color, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] elements) {
+element nested_blocks(pen color, pair fill_space = (1,1), real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] elements) {
     assert(elements.length >= 2, "empty nested blocks");
     assert(elements.length % 2 == 0, "odd number of nested elements");
     real w = 0, h = (1.5*elements.length+2)*block_padding;
@@ -351,15 +352,21 @@ element nested_blocks(pen color, real block_padding = BLOCK_PADDING, real block_
             assert(size.x >= w-EPSILON && size.y >= h-EPSILON, "cannot fit block in given size");
             picture pic;
             unitsize(pic, 1cm);
-            draw_shape(pic, instr_shape(size, block_padding), color, block_border);
+            real sy = size.y * fill_space.y + h * (1-fill_space.y);
+            real sx = 0;
+            for (element e : headers) sx = max(sx, e.min_size.x);
+            sx = size.x * fill_space.x + (sx + 2*block_padding) * (1-fill_space.x);
+            draw_shape(pic, instr_shape((sx,sy), block_padding), color, block_border);
+            pair extra = (0, (size.y-h)/blocks.length/2 * fill_space.y);
             real yoffs = block_padding;
             for (int i=blocks.length-1; i>=0; --i) {
                 yoffs += block_padding;
-                picture p = blocks[i].fit_to_size((size.x - 2*block_padding, blocks[i].min_size.y + (size.y-h)/blocks.length/2));
+                extra = ((size.x - 2*block_padding - blocks[i].min_size.x) * fill_space.x, extra.y);
+                picture p = blocks[i].fit_to_size(blocks[i].min_size + extra);
                 unitsize(p, 1cm);
                 add(pic, shift(3*block_padding, yoffs)*p);
                 yoffs += max(p, true).y + block_padding;
-                p = headers[i].fit_to_size((size.x - 2*block_padding, headers[i].min_size.y + (size.y-h)/blocks.length/2));
+                p = headers[i].fit_to_size((sx - 2*block_padding, headers[i].min_size.y + extra.y));
                 add(pic, shift(block_padding, yoffs)*p);
                 yoffs += max(p, true).y + block_padding;
             }
@@ -369,16 +376,16 @@ element nested_blocks(pen color, real block_padding = BLOCK_PADDING, real block_
 }
 
 // nests multiple block sequences into a single block
-element for_block(pen color = FOR_COLOR, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER, element header, element body) {
-    return nested_blocks(color, block_padding, block_border, header, body);
+element for_block(pair fill_space = (1,1), real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER, element header, element body) {
+    return nested_blocks(FOR_COLOR, fill_space, block_padding, block_border, header, body);
 }
 
 // nests multiple block sequences into a single block
-element if_block(pen color = IF_COLOR, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER, element header, element body) {
-    return nested_blocks(color, block_padding, block_border, header, body);
+element if_block(pair fill_space = (1,1), real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER, element header, element body) {
+    return nested_blocks(IF_COLOR, fill_space, block_padding, block_border, header, body);
 }
 
 // nests multiple block sequences into a single block
-element else_block(pen color = IF_COLOR, real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER, element then_header, element then_body, element else_header, element else_body) {
-    return nested_blocks(color, block_padding, block_border, then_header, then_body, else_header, else_body);
+element else_block(pair fill_space = (1,1), real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER, element then_header, element then_body, element else_header, element else_body) {
+    return nested_blocks(IF_COLOR, fill_space, block_padding, block_border, then_header, then_body, else_header, else_body);
 }
