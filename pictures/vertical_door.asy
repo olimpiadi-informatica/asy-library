@@ -1,4 +1,4 @@
-picture drawing(real k = 1, pen color = brown, pen knob = yellow, string title = "") {
+picture drawing(real k = 1, pen color = brown, pen knob = yellow) {
 	picture pic;
 	path p;
     // pomello
@@ -19,6 +19,5 @@ picture drawing(real k = 1, pen color = brown, pen knob = yellow, string title =
     p = (w,0)--(w,h)--(2*w, h)--(2*w,0)--cycle;
     fill(pic, p, color);
     
-    label(pic, scale(13*k/(length(title)+1)*1.45)*("\sc "+title), (-23,0));
     return scale(k/32)*pic;
 }
