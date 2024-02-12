@@ -18,6 +18,7 @@ pen DATA_COLOR = brown;
 pen CHOICE_COLOR = mediumblue;
 pen FOR_COLOR = magenta;
 pen IF_COLOR = yellow;
+pen TODO_COLOR = red;
 
 // layout element that can be fit to a given size above a minimum
 struct element {
@@ -299,9 +300,14 @@ element data_block(real block_padding = BLOCK_PADDING, real block_border = BLOCK
     return block(data_shape, DATA_COLOR, block_padding, block_border ... contents);
 }
 
-// generates a single instruction block given the content
+// generates a single drop-down choice block given the content
 element choice_block(real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
     return block(choice_shape, CHOICE_COLOR, block_padding, block_border ... contents);
+}
+
+// generates a single missing instruction block given the content
+element todo_block(real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
+    return block(instr_shape, TODO_COLOR, block_padding, block_border ... contents);
 }
 
 
