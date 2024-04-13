@@ -1,6 +1,7 @@
 pen tiptap_col = gray(0.8);
 pen carol_col = rgb("ba95c7");
 pen bunny_col = rgb("e2bd98");
+pen allie_col = rgb("f29d98");
 
 picture drawing(real k = 1, pen color = tiptap_col, pen skin = rgb("f9b3b1")) {
 	picture pic;
