@@ -1,7 +1,7 @@
 picture drawing(real k = 1, real aspect = 1, pen lightcol = rgb("9e6b5a"), pen darcol = rgb("310907")) {
     picture pic;
 
-    real step = 5 * k;
+    real step = 10 * k;
     fill(pic, (0,0) -- (0,100) -- (100*aspect, 100) -- (100*aspect,0) -- cycle, darcol);
     fill(pic, (step,step) -- (step,100-step) -- (100*aspect-step, 100-step) -- cycle, lightcol);
     fill(pic, (step,step) -- (100*aspect-step, step) -- (100*aspect-step, 100-step) -- cycle, lightcol*0.25+darcol*0.75);
