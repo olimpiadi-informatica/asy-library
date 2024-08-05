@@ -50,6 +50,8 @@ def path_to_cmds(s):
         try:
             args = map(float, v[i:i+numargs[curcmd.lower()]])
             w.append([curcmd] + list(args))
+            if curcmd.lower() == 'm':
+                curcmd = 'l' if curcmd == 'm' else 'L'
             i += numargs[curcmd.lower()]
         except Exception as e:
             print("COMANDO NON RICONOSCIUTO!", file=stderr)
@@ -231,7 +233,7 @@ def parse_style(s):
     if d != '':
         d = " //IGNORED: " + d
     if fill == 'invisible' and draw == 'invisible':
-        return d
+        return "fill(pic, p, black+evenodd);" + d
     if fill == 'invisible':
         return "draw(pic, p, %s);" % draw + d
     if draw == 'invisible':
@@ -270,7 +272,12 @@ def parse_svg(path, scale, approx):
     root = tree.getroot()
     if root.tag != "{http://www.w3.org/2000/svg}svg":
         raise RuntimeError("argument is not a valid svg file")
-    SIZE = (float(root.attrib['width']),float(root.attrib['height']))
+    def stripunit(s):
+        return s[:-2] if s[-2:] == "px" else s
+    if 'viewBox' in root.attrib:
+        SIZE = tuple(map(float,root.attrib['viewBox'].split()[2:]))
+    else:
+        SIZE = (float(stripunit(root.attrib['width'])),float(stripunit(root.attrib['height'])))
     if scale == 0:
         SCALE = 1
     else:
