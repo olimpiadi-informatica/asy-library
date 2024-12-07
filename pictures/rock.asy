@@ -1,4 +1,4 @@
-picture drawing(real k=1, pen col=heavygray) {
+picture drawing(real k=1, pen col=heavygray, Label text = "", pen textcolor = black) {
     picture pic;
     unitsize(pic, 1mm);
     path p;
@@ -12,5 +12,6 @@ picture drawing(real k=1, pen col=heavygray) {
     p = (-85,-99) -- (-74,-85) -- (-47,-31) -- (-11,-11) -- (-77,1) -- (-78,10) -- (-58,58) -- (-70,71);
     for (int i=0; i<4; ++i)
         draw(pic, point(p,2*i) -- point(p,2*i+1), col+0);
+    label(pic, scale(2)*text, (0,-100), textcolor);
     return scale(0.06*k)*pic;
 }
