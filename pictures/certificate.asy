@@ -1,7 +1,7 @@
-picture drawing(real k = 1) {
+picture drawing(real k = 1, pen col = palegray) {
 	picture pic;
 	path[] p;
-    draw(pic, (-5,-7) -- (5,-7) -- (5,5) -- (3,7) -- (-5,7) -- cycle, black+4*k);
+    filldraw(pic, (-5,-7) -- (5,-7) -- (5,5) -- (3,7) -- (-5,7) -- cycle, col, black+4*k);
     draw(pic, (5,5) -- (3,5) -- (3,7), black+4*k);
     path p;
     int NUM = 10;
