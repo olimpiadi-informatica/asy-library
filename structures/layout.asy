@@ -16,6 +16,7 @@ pen INSTR_COLOR = orange;
 pen COND_COLOR = green;
 pen DATA_COLOR = brown;
 pen CHOICE_COLOR = mediumblue;
+pen DEF_COLOR = START_COLOR;
 pen FOR_COLOR = magenta;
 pen IF_COLOR = yellow;
 pen TODO_COLOR = red;
@@ -340,7 +341,7 @@ element block_sequence(pair fill_space = (1,1), real block_border = BLOCK_BORDER
 }
 
 // nests multiple block sequences into a single block
-element nested_blocks(pen color, pair fill_space = (1,1), real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] elements) {
+element nested_blocks(path shape(pair,real) = instr_shape, pen color, pair fill_space = (1,1), real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] elements) {
     assert(elements.length >= 2, "empty nested blocks");
     assert(elements.length % 2 == 0, "odd number of nested elements");
     real w = 0, h = (1.5*elements.length+2)*block_padding;
@@ -362,7 +363,7 @@ element nested_blocks(pen color, pair fill_space = (1,1), real block_padding = B
             real sx = 0;
             for (element e : headers) sx = max(sx, e.min_size.x);
             sx = size.x * fill_space.x + (sx + 2*block_padding) * (1-fill_space.x);
-            draw_shape(pic, instr_shape((sx,sy), block_padding), color, block_border);
+            draw_shape(pic, shape((sx,sy), block_padding), color, block_border);
             pair extra = (0, (size.y-h)/blocks.length/2 * fill_space.y);
             real yoffs = block_padding;
             for (int i=blocks.length-1; i>=0; --i) {
@@ -379,6 +380,11 @@ element nested_blocks(pen color, pair fill_space = (1,1), real block_padding = B
             return pic;
         }
     );
+}
+
+// nests multiple block sequences into a single block
+element def_block(pair fill_space = (1,1), real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER, element header, element body) {
+    return nested_blocks(start_shape, DEF_COLOR, fill_space, block_padding, block_border, header, body);
 }
 
 // nests multiple block sequences into a single block
