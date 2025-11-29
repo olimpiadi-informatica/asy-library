@@ -24,7 +24,7 @@ void node(real node_size, pair pos, real text_size, string txt = "", pen foregro
 }
 
 // draw an edge
-void edge(real node_size, pair start, pair end, real text_size, string txt = "", pen p = black, real deg = 0, real bending = 0, bool arrow = true) {
+void edge(real node_size, pair start, pair end, real text_size, string txt = "", pen p = black, real deg = 0, real bending = 0, bool arrow = true, real edge_text_offset = 0.3) {
     path l;
     if (start != end) {
         pair d = unit(end-start) * node_size;
@@ -38,13 +38,14 @@ void edge(real node_size, pair start, pair end, real text_size, string txt = "",
     }
     if (arrow) draw(l, p, EndArrow(21*node_size));
     else draw(l, p);
-    pair center = midpoint(l) + rotate(90)*dir(l, 0.5, true)*0.3;
+    pair center = midpoint(l) + rotate(90)*dir(l, 0.5, true)*edge_text_offset;
+
     label(scale(text_size)*txt, center);
 }
 
 // interface for drawing an edge using computed parameters
-void computed_edge(pair[] P, int[][] E, int i, real node_size, real text_size, string txt = "", pen p = FOREGROUND, bool arrow = ORIENTED, void ec(pair,pair,string,pen,real,real,bool) = empty_edge_callback) {
-    edge(node_size, P[E[i][0]], P[E[i][1]], text_size, txt, p, deg[E[i][0]], bend[i], arrow);
+void computed_edge(pair[] P, int[][] E, int i, real node_size, real text_size, string txt = "", pen p = FOREGROUND, bool arrow = ORIENTED, real edge_text_offset, void ec(pair,pair,string,pen,real,real,bool) = empty_edge_callback) {
+    edge(node_size, P[E[i][0]], P[E[i][1]], text_size, txt, p, deg[E[i][0]], bend[i], arrow, edge_text_offset);
     ec(P[E[i][0]], P[E[i][1]], txt, p, deg[E[i][0]], bend[i], arrow);
 }
 
@@ -126,6 +127,7 @@ picture drawing(
     string[] edge_text = {""},
     pen[]    edge_color = {FOREGROUND},
     bool[]   edge_oriented = {ORIENTED},
+    real     edge_text_offset = 0.3,
     void     node_callback(pair,string,pen,pen) = empty_node_callback,
     void     edge_callback(pair,pair,string,pen,real,real,bool) = empty_edge_callback
 ) {
@@ -144,7 +146,7 @@ picture drawing(
     for (int i=0; i<N; ++i)
         node(node_size, node_position[i], text_size, node_text[i], node_foreground[i], node_background[i]);
     for (int i=0; i<M; ++i)
-        computed_edge(node_position, edge_vertex, i, node_size, text_size, edge_text[i], edge_color[i], edge_oriented[i], edge_callback);
+        computed_edge(node_position, edge_vertex, i, node_size, text_size, edge_text[i], edge_color[i], edge_oriented[i], edge_text_offset, edge_callback);
     for (int i=0; i<N; ++i)
         node_callback(node_position[i], node_text[i], node_foreground[i], node_background[i]);
     return pic;
