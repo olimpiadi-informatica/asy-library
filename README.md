@@ -17,7 +17,8 @@ add(shift(x, y) * mypicture.drawing(params...));
 More complex tools, for drawing structured objects. It includes:
 
 - `graph.asy` for drawing graphs;
-- `layout.asy` for auto-placement of elements in layouts and drawing block-style programs.
+- `histogram.asy` for drawing histograms;
+- `layout.asy` for auto-placement of elements in row/column layouts and drawing block-style programs.
 
 ### Tools
 
@@ -30,3 +31,9 @@ Converts an SVG file into Asymptote code, to allow parametrization of existing t
 ```
 tools/svg_to_asy.py -c 100 path/to/file.svg > path/to/file.asy
 ```
+
+#### PY to OII
+
+Converts a Python program into two representations:
+- an executable pseudocode program, according to the [OII specs](https://scolastiche.olinfo.it/Pseudocodice.pdf);
+- an italian blockly program, as in OII style, built with `layout.asy`.

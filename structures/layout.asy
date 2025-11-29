@@ -266,12 +266,14 @@ element block(path shape(pair,real), pen color, real block_padding = BLOCK_PADDI
     element content;
     if (contents.length == 1) content = contents[0];
     else content = block_content(block_padding ... contents);
+    real head = max(shape((20,20), block_padding)).y - 20;
     real w = content.min_size.x + 2*block_padding;
     real h = content.min_size.y + 3*block_padding;
     return element(
-        (w, h),
+        (w, h + head),
         new picture(pair size) {
             assert(size.x >= w-EPSILON && size.y >= h-EPSILON, "cannot fit block in given size");
+            size = (size.x, size.y - head);
             picture pic;
             unitsize(pic, 1cm);
             draw_shape(pic, shape(size, block_padding), color, block_border);
@@ -349,14 +351,16 @@ element nested_blocks(path shape(pair,real) = instr_shape, pen color, pair fill_
         w = max(w, e.min_size.x + 2*block_padding);
         h += e.min_size.y;
     }
+    real head = max(shape((20,20), block_padding)).y - 20;
     element[] headers;
     element[] blocks;
     for (int i=0; i<elements.length; i+=2) headers[i#2] = elements[i];
     for (int i=1; i<elements.length; i+=2) blocks[i#2] = elements[i];
     return element(
-        (w, h),
+        (w, h + head),
         new picture(pair size) {
             assert(size.x >= w-EPSILON && size.y >= h-EPSILON, "cannot fit block in given size");
+            size = (size.x, size.y - head);
             picture pic;
             unitsize(pic, 1cm);
             real sy = size.y * fill_space.y + h * (1-fill_space.y);
