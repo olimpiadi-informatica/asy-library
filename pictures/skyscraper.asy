@@ -27,5 +27,5 @@ picture drawing(pen col = black, real width = 1, real height = 1, real shrink = 
 		real win_x = x + shrink * (i+1) / n_win + unitrand() * (1 - 2 * shrink * (i+1) / n_win - win_w);
 		filldraw(pic, rect((win_x, win_y), win_w, win_h), white, col*0.3 + gray*0.7 + width);
 	}
-    return pic;
+    return scale(width)*pic;
 }

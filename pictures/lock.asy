@@ -19,7 +19,3 @@ picture drawing(pen col = rgb("ffd782"), pen col2 = gray(0.81), real k = 1) {
 	fill(pic, p, black+evenodd);
 	return scale(k/32)*pic;
 }
-
-unitsize(1cm);
-add(drawing());
-
