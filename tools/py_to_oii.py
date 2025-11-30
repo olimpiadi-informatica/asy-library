@@ -194,7 +194,7 @@ class PseudoCode(ast.NodeVisitor):
         return "<comp???>"
 
 
-ASY_HEADER = """access "../../asy_library/structures/layout.asy" as layout;
+ASY_HEADER = """access "../../asy-library/structures/layout.asy" as layout;
 
 unravel layout; // per evitare di scrivere layout.cose tutto il tempo
 
