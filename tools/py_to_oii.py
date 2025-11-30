@@ -175,7 +175,7 @@ class PseudoCode(ast.NodeVisitor):
 
     def render_op(self, op):
         if isinstance(op, ast.Add): return "+"
-        if isinstance(op, ast.Sub): return "-"
+        if isinstance(op, ast.Sub) or isinstance(op, ast.USub): return "-"
         if isinstance(op, ast.Mult): return "*"
         if isinstance(op, ast.Div) or isinstance(op, ast.FloorDiv): return "/"
         if isinstance(op, ast.Mod): return "mod"
@@ -222,8 +222,8 @@ class AsyBlocks(ast.NodeVisitor):
     def choice_block(self, content):
         return f'choice_block({content})'
 
-    def cond_block(self, left, op, right):
-        return f'cond_block({left}, {op}, {right})'
+    def cond_block(self, content):
+        return f'cond_block({content})'
 
     def instr_block(self, *args):
         return f'instr_block({", ".join(args)})'
@@ -314,11 +314,11 @@ class AsyBlocks(ast.NodeVisitor):
         test_node = node.test
         # Check for "while not" -> "ripeti fino a che" 
         if isinstance(test_node, ast.UnaryOp) and isinstance(test_node.op, ast.Not):
-            cond_str = self.render_expr(test_node.operand)
+            test_node = test_node.operand
             phrase = "ripeti fino a che"
         else:
-            cond_str = self.render_expr(test_node)
             phrase = "ripeti mentre"
+        cond_str = self.cond_block(self.render_expr(test_node))
 
         body_stmts = [self.visit(n) for n in node.body]
         body_str = self.indent(self.block_sequence(body_stmts))
@@ -329,7 +329,7 @@ class AsyBlocks(ast.NodeVisitor):
                 f")")
 
     def visit_If(self, node):
-        cond_str = self.render_expr(node.test)
+        cond_str = self.cond_block(self.render_expr(node.test))
         body_stmts = [self.visit(n) for n in node.body]
         if node.orelse:
             # If/Else block 
@@ -434,29 +434,29 @@ class AsyBlocks(ast.NodeVisitor):
              assert isinstance(node.left.right, ast.Constant) and node.left.right.value == 2
              assert len(node.comparators) == 1 and isinstance(node.comparators[0], ast.Constant)
              if node.comparators[0].value == 0:
-                 return f"cond_block({self.data_block(var)}, {self.e('è pari')})"
+                 return f"{self.data_block(var)}, {self.e('è pari')}"
              else:
-                 return f"cond_block({self.data_block(var)}, {self.e('è dispari')})"
+                 return f"{self.data_block(var)}, {self.e('è dispari')}"
         if isinstance(node, ast.Compare):
             if len(node.ops) == len(node.comparators) == 1:
                 left = self.render_expr(node.left)
                 right = self.render_expr(node.comparators[0])
                 op = self.render_compare_op(node.ops[0])
-                return self.cond_block(self.data_block(left), self.e(op), self.data_block(right))
+                return f"{self.data_block(left)}, {self.e(op)}, {self.data_block(right)}"
             return "<compare???>"
         if isinstance(node, ast.BoolOp):
-            values = [self.render_expr(v) for v in node.values]
+            values = [self.cond_block(self.render_expr(v)) for v in node.values]
             op = self.render_op(node.op)
-            return f"cond_block({values[0]}, {self.e(op)}, {values[1]})"
+            return f"{values[0]}, {self.e(op)}, {values[1]}"
         if isinstance(node, ast.UnaryOp):
             inner = self.render_expr(node.operand)
             op = self.render_op(node.op)
-            return f"{'cond_block' if isinstance(node.op, ast.Not) else 'data_block'}({self.e(op)}, {inner})"
+            return f"{self.e(op)}, {'cond_block' if isinstance(node.op, ast.Not) else 'data_block'}({inner})"
         return "<expr???>"
 
     def render_op(self, op):
         if isinstance(op, ast.Add): return "$+$"
-        if isinstance(op, ast.Sub): return "$-$"
+        if isinstance(op, ast.Sub) or isinstance(op, ast.USub): return "$-$"
         if isinstance(op, ast.Mult): return r"$\times$"
         if isinstance(op, ast.Div) or isinstance(op, ast.FloorDiv): return r"$\div$"
         if isinstance(op, ast.And): return "e"
