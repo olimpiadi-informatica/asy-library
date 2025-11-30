@@ -17,7 +17,7 @@ picture drawing(pen col = black, real width = 1, real height = 1, real shrink = 
         fill(pic, circle((x+.5, height + antenna_h), antenna_r), darcol);
     }
 
-	int n_win = (3 + rand() % 3) * (int)height;
+	int n_win = (2 + rand() % 3) * (int)(height+1);
 	for (int i = 0; i < n_win; ++i) {
 		real win_w = .1 + unitrand() * .1;
 		real win_h = win_w * (unitrand() + 1);
