@@ -12,3 +12,7 @@ void fitlabel(picture pic=currentpicture, Label L, pair position, pair align=(0,
     position -= (bb_min.x*align.x + bb_max.x*(1-align.x), bb_min.y*align.y + bb_max.y*(1-align.y));
     add(pic, shift(position)*temp);
 }
+
+path rect(pair p, pair q) {
+    return p -- (p.x,q.y) -- q -- (q.x,p.y) -- cycle;
+}
