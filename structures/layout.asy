@@ -19,7 +19,7 @@ pen CHOICE_COLOR = mediumblue;
 pen DEF_COLOR = START_COLOR;
 pen FOR_COLOR = magenta;
 pen IF_COLOR = yellow;
-pen TODO_COLOR = red;
+pen TODO_COLOR = white;
 
 // layout element that can be fit to a given size above a minimum
 struct element {
@@ -255,9 +255,21 @@ path choice_shape(pair size, real padding) {
     return roundedpath(g, 0.3*padding);
 }
 
+// the todo instruction block shape
+path todo_shape(pair size, real padding) {
+    guide g = (size.x-0.5*padding,size.y) -- reverse(shift(0, size.y)*scale(padding)*block_dent) -- scale(padding)*block_dent -- (size.x-0.5*padding, 0);
+    return roundedpath(g, 0.3*padding);
+}
+
+
 // draws a general shape
 void draw_shape(picture pic, path shape, pen color, real block_border) {
-    filldraw(pic, shape, 0.3*color + 0.7*white, 0.7*color + 0.3*black + block_border);
+    if (cyclic(shape))
+        filldraw(pic, shape, 0.3*color + 0.7*white, 0.7*color + 0.3*black + block_border);
+    else {
+        fill(pic, shape -- cycle, 0.3*color + 0.7*white);
+        draw(pic, shape, 0.7*color + 0.3*black + block_border);
+    }
 }
 
 
@@ -310,7 +322,7 @@ element choice_block(real block_padding = BLOCK_PADDING, real block_border = BLO
 
 // generates a single missing instruction block given the content
 element todo_block(real block_padding = BLOCK_PADDING, real block_border = BLOCK_BORDER ... element[] contents) {
-    return block(instr_shape, TODO_COLOR, block_padding, block_border ... contents);
+    return block(todo_shape, TODO_COLOR, block_padding, block_border ... contents);
 }
 
 

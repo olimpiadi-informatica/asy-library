@@ -62,7 +62,10 @@ class PseudoCode(ast.NodeVisitor):
         self.emit(f"variable {var}: {t}")
 
     def visit_Expr(self, node):
-        val = self.render_expr(node.value)
+        if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            val = node.value.value
+        else:
+            val = self.render_expr(node.value)
         self.emit(val)
 
     def visit_If(self, node):
@@ -228,6 +231,9 @@ class AsyBlocks(ast.NodeVisitor):
     def instr_block(self, *args):
         return f'instr_block({", ".join(args)})'
 
+    def todo_block(self, arg):
+        return f'todo_block({arg})'
+
     def indent(self, s, n = 1):
         return '    '*n + s.replace('\n', '\n' + '    '*n)
 
@@ -379,6 +385,8 @@ class AsyBlocks(ast.NodeVisitor):
         return self.instr_block(self.e("restituisci"), self.data_block(self.render_expr(node.value)))
 
     def visit_Expr(self, node):
+        if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            return self.todo_block(self.e(node.value.value))
         return self.visit(node.value)
 
     def visit_Call(self, node, inexpr = False):
@@ -487,6 +495,7 @@ if __name__ == "__main__":
         print('- You can also write post-amble code after a second line equal to "###" to be ignored in translation.')
         print('- If the entire code is a single function that starts with "__", its body is rendered instead.')
         print('- Functions that starts with "_" and have no arguments are rendered in blockly as simple start blocks.')
+        print('- A single string as a statement is rendered in pseudocode and blockly as a "TODO" part.')
         print('- If the upper bound of a for loop ends in "+1", it is rendered as a loop on a right-closed interval.')
         print('- For-loops with a step that is different from 1 are rendered as while statements in pseudocode.')
         print('- Variables starting with "_" are not rendered in blockly (in order to model "ripeti N" statements),')
