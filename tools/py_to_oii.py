@@ -118,7 +118,7 @@ class PseudoCode(ast.NodeVisitor):
                 self.indent -= 1
                 self.emit("end while")
                 return
-            self.emit(f"for {target} in [{start}...{stop}{close} do")
+            self.emit(f"for {target} in [{start} ... {stop}{close} do")
             self.indent += 1
             for stmt in node.body:
                 self.visit(stmt)
