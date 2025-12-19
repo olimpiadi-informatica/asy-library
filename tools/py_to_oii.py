@@ -2,6 +2,8 @@
 
 import ast
 
+permissive = False
+
 class PseudoCode(ast.NodeVisitor):
     def generate(self, tree):
         self.lines = ['```srs']
@@ -18,6 +20,8 @@ class PseudoCode(ast.NodeVisitor):
             self.visit(stmt)
 
     def visit_FunctionDef(self, node):
+        if len(self.lines) > 1:
+            self.emit("")
         params = []
         for arg in node.args.args:
             t = "integer"
@@ -38,11 +42,11 @@ class PseudoCode(ast.NodeVisitor):
 
     def visit_Assign(self, node):
         # swap detection: a, b = b, a
-        if isinstance(node.targets[0], ast.Tuple) and isinstance(node.value, ast.Tuple):
+        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Tuple) and isinstance(node.value, ast.Tuple):
             left = [self.render_expr(t) for t in node.targets[0].elts]
             right = [self.render_expr(v) for v in node.value.elts]
             if len(left) == 2 and left[::-1] == right:
-                self.emit(f"({left[0]}, {left[1]}) ← ({right[0]}, {right[1]})")
+                self.emit(f"({left[0]}, {left[1]}) <- ({right[0]}, {right[1]})")
                 return
         target = self.render_expr(node.targets[0])
         value = self.render_expr(node.value)
@@ -60,6 +64,8 @@ class PseudoCode(ast.NodeVisitor):
         var = node.target.id
         t = self.render_type(node.annotation)
         self.emit(f"variable {var}: {t}")
+        if node.value:
+            self.visit_Assign(ast.Assign(targets=[node.target], value=node.value))
 
     def visit_Expr(self, node):
         if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
@@ -137,6 +143,9 @@ class PseudoCode(ast.NodeVisitor):
         if isinstance(ann, ast.Name):
             if ann.id == "int":
                 return "integer"
+            if permissive:
+                translate = {"bool": "boolean", "float": "real", "str": "string"}
+                return translate[ann.id] if ann.id in translate else ann.id
         if isinstance(ann, ast.Subscript) and ann.value.id == "list":
             base = self.render_type(ann.slice)
             return f"{base}[]"
@@ -144,7 +153,11 @@ class PseudoCode(ast.NodeVisitor):
 
     def render_expr(self, node):
         if isinstance(node, ast.Constant):
-            if isinstance(node.value, int):
+            if isinstance(node.value, int) and not isinstance(node.value, bool):
+                return str(node.value)
+            if permissive:
+                if isinstance(node.value, bool):
+                    return str(node.value).lower()
                 return str(node.value)
             return "<const???>"
         if isinstance(node, ast.Name):
@@ -255,7 +268,9 @@ class AsyBlocks(ast.NodeVisitor):
                     elements = []
                 lines.append(self.visit(n))
             else:
-                elements.append(self.visit(n))
+                res = self.visit(n)
+                if res:
+                    elements.append(res)
         if elements:
             lines.append(self.block_sequence(elements))
         return ASY_HEADER + self.indent(",\n".join(lines)) + "\n);\n\nadd(P.drawing());"
@@ -266,6 +281,7 @@ class AsyBlocks(ast.NodeVisitor):
             arg_names = [self.choice_block(self.e(arg.arg)) for arg in node.args.args]
             args_str = f", {self.e("con")}, " + f", {self.e("e")}, ".join(arg_names)
         body_stmts = [self.visit(n) for n in node.body]
+        body_stmts = [x for x in body_stmts if x]
 
         name = node.name
         if name[0] == '_' and not node.args.args:
@@ -275,9 +291,8 @@ class AsyBlocks(ast.NodeVisitor):
 
         name = name.replace('_', ' ')
         return (f"def_block(\n"
-                f"    block_content({self.e('per fare')}, {self.data_block(self.e(name))}{args_str}, {self.e(':')}),\n"
-                f"{self.indent(self.block_sequence(body_stmts))}\n"
-                f")")
+                f"    block_content({self.e('per fare')}, {self.data_block(self.e(name))}{args_str}, {self.e(':')})" +
+                (f",\n{self.indent(self.block_sequence(body_stmts))}\n" if body_stmts else "\n") + ")")
 
     def visit_For(self, node):
         assert isinstance(node.iter, ast.Call) and node.iter.func.id == 'range'
@@ -354,14 +369,12 @@ class AsyBlocks(ast.NodeVisitor):
                     f"\n)")
 
     def visit_Assign(self, node):
-        # Handle Swap: a, b = b, a 
-        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Tuple):
-            target_tuple = node.targets[0]
-            value_tuple = node.value
-            assert isinstance(value_tuple, ast.Tuple) and len(target_tuple.elts) == 2
-            var1 = self.render_expr(target_tuple.elts[0])
-            var2 = self.render_expr(target_tuple.elts[1])
-            return self.instr_block(self.e("scambia valore di"), self.choice_block(var1), self.e("e"), self.choice_block(var2))
+        # swap detection: a, b = b, a
+        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Tuple) and isinstance(node.value, ast.Tuple):
+            left = [self.render_expr(t) for t in node.targets[0].elts]
+            right = [self.render_expr(v) for v in node.value.elts]
+            if len(left) == 2 and left[::-1] == right:
+                return self.instr_block(self.e("scambia valore di"), self.choice_block(left[0]), self.e("e"), self.choice_block(left[1]))
         target = self.render_expr(node.targets[0])
         value = self.render_expr(node.value)
         return self.instr_block(self.e("imposta"), self.choice_block(target), self.e("a"), self.data_block(value))
@@ -380,6 +393,11 @@ class AsyBlocks(ast.NodeVisitor):
             value = f"{self.data_block(target)}, {self.e(op)}, {self.data_block(self.render_expr(node.value))}"
             return self.instr_block(self.e("imposta"), self.choice_block(target), self.e("a"), self.data_block(value))
         return self.instr_block(self.e("cambia"), self.choice_block(target), self.e("di"), self.data_block(value))
+
+    def visit_AnnAssign(self, node):
+        assert isinstance(node.target, ast.Name)
+        if node.value:
+            return self.visit_Assign(ast.Assign(targets=[node.target], value=node.value))
 
     def visit_Return(self, node):
         return self.instr_block(self.e("restituisci"), self.data_block(self.render_expr(node.value)))
@@ -405,12 +423,16 @@ class AsyBlocks(ast.NodeVisitor):
         return body if inexpr else self.instr_block(body)
 
     def visit_Name(self, node):
-        if node.id[0] != "_":
+        if node.id[0] != "_" or permissive:
             return self.e(node.id).replace('_', ' ')
         return "<var???>"
 
     def visit_Constant(self, node):
-        if isinstance(node.value, int):
+        if isinstance(node.value, int) and not isinstance(node.value, bool):
+            return self.e(str(node.value))
+        if permissive:
+            if isinstance(node.value, bool):
+                return self.e("vero" if node.value else "falso")
             return self.e(str(node.value))
         return "<const???>"
 
@@ -484,11 +506,19 @@ class AsyBlocks(ast.NodeVisitor):
 
 if __name__ == "__main__":
     import sys
+    if len(sys.argv) > 1 and sys.argv[1] == '-a':
+        permissive = True
+        sys.argv = sys.argv[:1] + sys.argv[2:]
     if len(sys.argv) == 1:
         print("No file path specified. Enter python code here (use -h flag for help):")
         lines = sys.stdin.readlines()
     elif sys.argv[1] == '-h' or len(sys.argv) > 2:
         print("Generator of OII pseudocode and OII blockly (in asy) from python code.")
+        print('USAGE:')
+        print('%s [-a] [-h] [path]' % sys.argv[0])
+        print('-a ensures permissive behaviour on unhandled expressions')
+        print('-h prints this help and exits')
+        print('path is the file to process, if not provided stdin is used instead')
         print()
         print('CAVEATS:')
         print('- You can write preamble code before a line equal to "###", and it will be ignored (not translated).')
