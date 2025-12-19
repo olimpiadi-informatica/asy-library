@@ -77,7 +77,7 @@ element e(string text, real size=TEXT_SIZE, pen p=currentpen, real keep_aspect=1
 
 
 // layout element boxing another element in various directions
-element box(real padding=0, bool draw_up=true, bool draw_down=true, bool draw_left=true, bool draw_right=true, pen border=BOX_COLOR+BOX_BORDER, element e) {
+element box(real padding=0, pair fill_space=(0,0), pair align=ALIGN, bool draw_up=true, bool draw_down=true, bool draw_left=true, bool draw_right=true, pen border=BOX_COLOR+BOX_BORDER, element e) {
     real w = e.min_size.x+2*padding;
     real h = e.min_size.y+2*padding;
     return element(
@@ -86,7 +86,10 @@ element box(real padding=0, bool draw_up=true, bool draw_down=true, bool draw_le
             assert(size.x >= w-EPSILON && size.y >= h-EPSILON, "cannot fit element in given size");
             picture pic;
             unitsize(pic, 1cm);
-            add(pic, shift(padding, padding)*e.fit_to_size((size.x-2*padding, size.y-2*padding)));
+            real sx = w + (size.x - w)*fill_space.x - 2*padding;
+            real sy = h + (size.y - h)*fill_space.y - 2*padding;
+            pair extra = size - (sx, sy);
+            add(pic, shift(extra.x*align.x, extra.y*align.y)*e.fit_to_size((sx, sy)));
             if (draw_up)    draw(pic, (0,size.y) -- size,  border);
             if (draw_down)  draw(pic, (0,0) -- (size.x,0), border);
             if (draw_left)  draw(pic, (0,0) -- (0,size.y), border);
